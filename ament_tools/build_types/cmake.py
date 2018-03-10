@@ -179,19 +179,20 @@ class CmakeBuildType(BuildType):
             cmake_args = list(extra_cmake_args)
             cmake_args += ['-DCMAKE_INSTALL_PREFIX=' + context.install_space]
             if IS_WINDOWS:
-                vsv = get_visual_studio_version()
-                if vsv is None:
-                    sys.stderr.write(
-                        'VisualStudioVersion is not set, '
-                        'please run within a Visual Studio Command Prompt.\n')
-                    raise VerbExecutionError('Could not determine Visual Studio Version')
-                supported_vsv = {
-                    '14.0': 'Visual Studio 14 2015 Win64',
-                    '15.0': 'Visual Studio 15 2017 Win64',
-                }
-                if vsv not in supported_vsv:
-                    raise VerbExecutionError('Unknown / unsupported VS version: ' + vsv)
-                cmake_args += ['-G', supported_vsv[vsv]]
+                if not '-G' in context.cmake_args:
+                    vsv = get_visual_studio_version()
+                    if vsv is None:
+                        sys.stderr.write(
+                            'VisualStudioVersion is not set, '
+                            'please run within a Visual Studio Command Prompt.\n')
+                        raise VerbExecutionError('Could not determine Visual Studio Version')
+                    supported_vsv = {
+                        '14.0': 'Visual Studio 14 2015 Win64',
+                        '15.0': 'Visual Studio 15 2017 Win64',
+                    }
+                    if vsv not in supported_vsv:
+                        raise VerbExecutionError('Unknown / unsupported VS version: ' + vsv)
+                    cmake_args += ['-G', supported_vsv[vsv]]
             elif IS_MACOSX:
                 if context.use_xcode or self._using_xcode_generator(context):
                     cmake_args += ['-G', 'Xcode']
@@ -238,6 +239,8 @@ class CmakeBuildType(BuildType):
             cmd += [
                 '/p:Configuration=%s' %
                 self._get_configuration_from_cmake(context), solution_file]
+            cmd += ['/p:Platform=%s' %
+                self._get_msbuild_platform_from_cmake(context)]
             yield BuildAction(cmd, env=env)
         elif IS_MACOSX:
             if self._using_xcode_generator(context):
@@ -572,3 +575,37 @@ class CmakeBuildType(BuildType):
             CmakeBuildType.build_type, name, context,
             additional_dependencies=additional_dependencies,
             additional_lines=additional_lines)
+
+    def _get_msbuild_platform_from_cmake(self, context):
+        # check for CMake platform in the command line arguments
+        arg_prefix = '-G'
+        msbuild_platform = None
+        cmake_generator = None
+        try:
+            index = context.cmake_args.index(arg_prefix)
+            cmake_generator = context.cmake_args[index + 1]
+        except ValueError:
+            pass
+        if not cmake_generator:
+            # get for CMake build type from the CMake cache
+            line_prefix = 'CMAKE_GENERATOR:'
+            cmake_cache = os.path.join(context.build_space, 'CMakeCache.txt')
+            if os.path.exists(cmake_cache):
+                with open(cmake_cache, 'r') as h:
+                    lines = h.read().splitlines()
+                for line in lines:
+                    if line.startswith(line_prefix):
+                        try:
+                            index = line.index('=')
+                        except ValueError:
+                            continue
+                        cmake_generator = line[index + 1:]
+                        break
+
+        if cmake_generator.endswith('ARM'):
+            msbuild_platform = 'ARM'
+        elif cmake_generator.endswith('Win64'):
+            msbuild_platform = 'x64'
+        else:
+            msbuild_platform = 'Win32'
+        return msbuild_platform
