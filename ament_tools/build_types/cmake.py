@@ -509,6 +509,8 @@ class CmakeBuildType(BuildType):
                     if XCODEBUILD_EXECUTABLE is None:
                         raise VerbExecutionError("Could not find 'xcodebuild' executable")
                     cmd = prefix + [XCODEBUILD_EXECUTABLE]
+                    cmd += ['-configuration']
+                    cmd += [self._get_configuration_from_cmake(context)]
                     cmd += ['-target', 'install']
                     yield BuildAction(cmd)
             else:
@@ -554,6 +556,8 @@ class CmakeBuildType(BuildType):
                 if XCODEBUILD_EXECUTABLE is None:
                     raise VerbExecutionError("Could not find 'xcodebuild' executable")
                 cmd = prefix + [XCODEBUILD_EXECUTABLE]
+                cmd += ['-configuration']
+                cmd += [self._get_configuration_from_cmake(context)]
                 cmd += ['-target', 'uninstall']
                 yield BuildAction(cmd)
             else:
