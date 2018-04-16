@@ -213,11 +213,12 @@ class CmakeBuildType(BuildType):
         if IS_LINUX:
             yield self._make_or_ninja_build(context, prefix)
         elif IS_WINDOWS:
-            if MSBUILD_EXECUTABLE is None:
+            msbuild_executable = self._get_msbuild_executable(context)
+            if msbuild_executable is None:
                 raise VerbExecutionError("Could not find 'msbuild' executable")
             solution_file = solution_file_exists_at(
                 context.build_space, context.package_manifest.name)
-            cmd = prefix + [MSBUILD_EXECUTABLE]
+            cmd = prefix + [msbuild_executable]
             env = None
             # Convert make parallelism flags into msbuild flags
             msbuild_flags = [
@@ -490,11 +491,12 @@ class CmakeBuildType(BuildType):
             install_project_file = project_file_exists_at(
                 context.build_space, 'INSTALL')
             if install_project_file is not None:
-                if MSBUILD_EXECUTABLE is None:
+                msbuild_executable = self._get_msbuild_executable(context)
+                if msbuild_executable is None:
                     raise VerbExecutionError("Could not find 'msbuild' executable")
                 yield BuildAction(
                     prefix + [
-                        MSBUILD_EXECUTABLE,
+                        msbuild_executable,
                         '/p:Configuration=' + self._get_configuration_from_cmake(context),
                         install_project_file])
             else:
@@ -545,11 +547,12 @@ class CmakeBuildType(BuildType):
             if build_action:
                 yield build_action
         elif IS_WINDOWS:
-            if MSBUILD_EXECUTABLE is None:
+            msbuild_executable = self._get_msbuild_executable(context)
+            if msbuild_executable is None:
                 raise VerbExecutionError("Could not find 'msbuild' executable")
             uninstall_project_file = project_file_exists_at(context.build_space, 'UNINSTALL')
             if uninstall_project_file is not None:
-                yield BuildAction(prefix + [MSBUILD_EXECUTABLE, uninstall_project_file])
+                yield BuildAction(prefix + [msbuild_executable, uninstall_project_file])
             else:
                 self.warn("Could not find Visual Studio project file 'UNINSTALL.vcxproj'")
         elif IS_MACOSX:
@@ -609,3 +612,10 @@ class CmakeBuildType(BuildType):
         else:
             msbuild_platform = 'Win32'
         return msbuild_platform
+
+    def _get_msbuild_executable(self, context):
+        for cmake_arg in context.cmake_args:
+            if cmake_arg.startswith('-DMSBUILD_EXECUTABLE='):
+                _, msbuild_executable = cmake_arg.split('=')
+                return msbuild_executable
+        return MSBUILD_EXECUTABLE
