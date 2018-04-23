@@ -83,6 +83,10 @@ class CmakeBuildType(BuildType):
                 '--use-xcode',
                 action='store_true',
                 help='Use Xcode instead of Make')
+        if IS_WINDOWS:
+            parser.add_argument(
+                '--msbuild-executable',
+                help='Path to MSBuild executable')
         parser.add_argument(
             '--use-ninja',
             action='store_true',
@@ -110,6 +114,7 @@ class CmakeBuildType(BuildType):
         ce.add('ctest_args', getattr(options, 'ctest_args', []))
         ce.add('use_xcode', getattr(options, 'use_xcode', False))
         ce.add('use_ninja', getattr(options, 'use_ninja', False))
+        ce.add('msbuild_executable', getattr(options, 'msbuild_executable', None))
         return ce
 
     def on_build(self, context):
@@ -614,8 +619,6 @@ class CmakeBuildType(BuildType):
         return msbuild_platform
 
     def _get_msbuild_executable(self, context):
-        for cmake_arg in context.cmake_args:
-            if cmake_arg.startswith('-DMSBUILD_EXECUTABLE='):
-                _, msbuild_executable = cmake_arg.split('=')
-                return msbuild_executable
+        if context.msbuild_executable:
+            return context.msbuild_executable
         return MSBUILD_EXECUTABLE
